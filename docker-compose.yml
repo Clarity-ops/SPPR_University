@@ -1,0 +1,20 @@
+services:
+  mysql-db:
+    image: mysql:8.0
+    container_name: sppr_mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword # Пароль суперкористувача
+      MYSQL_DATABASE: sppr_db # Назва нашої бази даних
+      MYSQL_USER: sppr_user # Користувач для нашого Node.js
+      MYSQL_PASSWORD: sppr_password # Пароль для нашого користувача
+    ports:
+      - "3306:3306"
+    volumes:
+      # Зберігаємо дані бази, щоб вони не зникли при перезапуску контейнера
+      - mysql_data:/var/lib/mysql
+      # Прокидаємо наш SQL-скрипт для автоматичної ініціалізації таблиць
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+
+volumes:
+  mysql_data:
