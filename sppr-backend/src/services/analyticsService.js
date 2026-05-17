@@ -1,106 +1,108 @@
-import { findByProjectId as findAlternativeByProjectId } from '../repositories/alternativeRepository.js';
 import { findByProjectId as findCriterionByProjectId } from '../repositories/criterionRepository.js';
-import { findByProject as findEvaluationByProjectId } from '../repositories/evaluationRepository.js';
+import { applyLogicToMatrix } from './expertLogicService.js';
 
-export const calculateProjectRanking = async (projectId) => {
-  // 1. Fetch all required data for the project
-  const alternatives = await findAlternativeByProjectId(projectId);
-  const criterias = await findCriterionByProjectId(projectId);
+export const calculateRanking = async (projectId) => {
+  // 1. Отримуємо критерії з їхніми типами та узгодженими вагами
+  const criteria = await findCriterionByProjectId(projectId);
 
-  if (alternatives.length === 0 || criterias.length === 0) {
-    throw new Error(
-      'Not enough data to calculate ranking. Ensure you have alternatives and criteria.',
-    );
+  if (!criteria.length) throw new Error('No criteria found for this project');
+
+  // 2. Застосовуємо експертну логіку (Пороги та Правила IF-THEN)
+  const logicResult = await applyLogicToMatrix(projectId);
+  const { eligibleAlternatives, adjustedEvaluations, analysisLog } =
+    logicResult;
+
+  // Якщо всі альтернативи були відфільтровані
+  if (!eligibleAlternatives.length) {
+    return {
+      rankings: [],
+      bestAlternative: null,
+      analysisLog: [
+        ...analysisLog,
+        'All alternatives were excluded by thresholds or rules.',
+      ],
+    };
   }
 
-  const evaluations = await findEvaluationByProjectId(projectId);
+  // 3. Знаходимо min та max для кожного критерію (для правильної нормалізації)
+  const critValues = {};
+  criteria.forEach(
+    (c) => (critValues[c.id] = { max: -Infinity, min: Infinity }),
+  );
 
-  // 2. Build the Matrix and find Min/Max for each criterion
-  const matrix = {}; // { altId: { critId: value } }
-  const critBounds = {}; // { critId: { min: val, max: val } }
-
-  criterias.forEach((c) => {
-    critBounds[c.id] = { min: Infinity, max: -Infinity };
+  adjustedEvaluations.forEach((evalRow) => {
+    const cId = evalRow.criterionId;
+    if (critValues[cId]) {
+      const numValue = Number(evalRow.value);
+      if (numValue > critValues[cId].max) critValues[cId].max = numValue;
+      if (numValue < critValues[cId].min) critValues[cId].min = numValue;
+    }
   });
 
-  evaluations.forEach((e) => {
-    if (!matrix[e.alternative_id]) matrix[e.alternative_id] = {};
-    matrix[e.alternative_id][e.criterion_id] = Number(e.value);
+  // 4. Нормалізуємо оцінки за мінімаксним алгоритмом
+  const normalizedMatrix = {};
+  eligibleAlternatives.forEach((alt) => (normalizedMatrix[alt.id] = {}));
 
-    if (e.value < critBounds[e.criterion_id].min)
-      critBounds[e.criterion_id].min = Number(e.value);
-    if (e.value > critBounds[e.criterion_id].max)
-      critBounds[e.criterion_id].max = Number(e.value);
-  });
+  adjustedEvaluations.forEach((evalRow) => {
+    const cId = evalRow.criterionId;
+    const cType = criteria.find((c) => c.id === cId)?.type;
+    const val = Number(evalRow.value);
+    const { max, min } = critValues[cId];
 
-  // 3. Normalize values & Calculate Scores
-  const results = alternatives.map((alt) => {
-    let sawScore = 0;
-    let wpmScore = 1;
-    let missingData = false;
-
-    criterias.forEach((crit) => {
-      const rawValue = matrix[alt.id]?.[crit.id];
-      if (rawValue === undefined) {
-        missingData = true;
-        return;
-      }
-
-      let normalizedValue = 0;
-      const { min, max } = critBounds[crit.id];
-
-      // Prevent division by zero if all values are identical
-      if (max === min) {
-        normalizedValue = 1;
+    let normVal;
+    if (max === min) {
+      normVal = 1; // Якщо всі значення однакові
+    } else {
+      if (cType === 'maximize') {
+        normVal = (val - min) / (max - min);
       } else {
-        // Robust Min-Max Normalization
-        if (crit.type === 'maximize') {
-          normalizedValue = (rawValue - min) / (max - min);
-        } else if (crit.type === 'minimize') {
-          normalizedValue = (max - rawValue) / (max - min);
-        }
+        // minimize
+        normVal = (max - val) / (max - min);
       }
+    }
+    normalizedMatrix[evalRow.alternativeId][cId] = normVal;
+  });
 
-      const weight = Number(crit.weight);
+  // 5. Обчислюємо інтегральні оцінки (Згортка)
+  const results = eligibleAlternatives.map((alt) => {
+    let additiveScore = 0;
+    let multiplicativeScore = 1;
+    let cautiousScore = Infinity;
 
-      // Simple Additive Weighting (SAW)
-      sawScore += normalizedValue * weight;
+    criteria.forEach((c) => {
+      const w = Number(c.weight) || 0;
+      const norm = normalizedMatrix[alt.id][c.id] || 0;
 
-      // Weighted Product Model (WPM)
-      // We clamp the minimum value to 0.0001 for WPM to prevent absolute zero
-      // from wiping out the entire multiplication chain.
-      const wpmSafeValue = Math.max(normalizedValue, 0.0001);
-      wpmScore *= Math.pow(wpmSafeValue, weight);
+      // Адитивна згортка (SAW)
+      additiveScore += norm * w;
+
+      // Мультиплікативна згортка (WPM)
+      // Використовуємо 0.0001 замість 0, щоб уникнути множення на 0 для найгірших значень
+      const safeNorm = norm > 0 ? norm : 0.0001;
+      multiplicativeScore *= Math.pow(safeNorm, w);
+
+      // Обережна згортка (Мінімум) - визначається за найслабшим зваженим показником
+      const weightedScore = norm * w;
+      if (weightedScore < cautiousScore) {
+        cautiousScore = weightedScore;
+      }
     });
 
     return {
-      alternative_id: alt.id,
+      id: alt.id,
       name: alt.name,
-      sawScore: missingData ? null : Number(sawScore.toFixed(4)),
-      wpmScore: missingData ? null : Number(wpmScore.toFixed(4)),
-      missingData,
+      additiveScore: Number(additiveScore.toFixed(4)),
+      multiplicativeScore: Number(multiplicativeScore.toFixed(4)),
+      cautiousScore: Number(cautiousScore.toFixed(4)),
     };
   });
 
-  if (results.some((r) => r.missingData)) {
-    throw new Error(
-      'Incomplete matrix: All alternatives must have values for all criteria.',
-    );
-  }
-
-  // 4. Sort and Rank (Based on SAW by default, highest is best)
-  results.sort((a, b) => b.sawScore - a.sawScore);
-
-  // 5. Generate Explanation
-  const bestAlt = results[0];
-  const explanation = `Based on the Simple Additive Weighting (SAW) method, the optimal choice is '${bestAlt.name}' with a score of ${bestAlt.sawScore}. The Weighted Product Model (WPM) confirms a score of ${bestAlt.wpmScore}.`;
+  // 6. Ранжування (за замовчуванням за адитивною згорткою)
+  results.sort((a, b) => b.additiveScore - a.additiveScore);
 
   return {
     rankings: results,
-    explanation,
-    methodsUsed: [
-      'Simple Additive Weighting (SAW)',
-      'Weighted Product Model (WPM)',
-    ],
+    bestAlternative: results.length > 0 ? results[0] : null,
+    analysisLog,
   };
 };

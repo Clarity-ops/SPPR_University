@@ -2,7 +2,6 @@ services:
   mysql-db:
     image: mysql:8.0
     container_name: sppr_mysql
-    restart: always
     environment:
       MYSQL_ROOT_PASSWORD: rootpassword # Пароль суперкористувача
       MYSQL_DATABASE: sppr_db # Назва нашої бази даних

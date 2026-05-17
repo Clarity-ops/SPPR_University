@@ -8,6 +8,8 @@ import alternativeRoutes from './routes/alternativeRoutes.js';
 import evaluationRoutes from './routes/evaluationRoutes.js';
 import criterionRoutes from './routes/criterionRoutes.js';
 import analyticsRoutes from './routes/analyticsRoutes.js';
+import expertRoutes from './routes/expertRoutes.js';
+import expertLogicRoutes from './routes/expertLogicRoutes.js';
 
 const app = express();
 
@@ -23,6 +25,8 @@ app.use('/api/alternatives', alternativeRoutes);
 app.use('/api/evaluations', evaluationRoutes);
 app.use('/api/criteria', criterionRoutes);
 app.use('/api/analytics', analyticsRoutes);
+app.use('/api/experts', expertRoutes);
+app.use('/api/logic', expertLogicRoutes);
 
 const startServer = async () => {
   db.getConnection()

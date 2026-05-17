@@ -1,11 +1,14 @@
 import React, { useState, useMemo } from 'react';
 import apiClient from '../api/client';
+import ExpertiseMathPanel from './ExpertiseMathPanel';
 
 const MatrixTable = ({
   alternatives,
   criteria,
   evaluations,
+  projectId,
   onEvaluationUpdated,
+  onAggregationSuccess,
   onEditAlternative,
   onDeleteAlternative,
   onEditCriterion,
@@ -111,96 +114,105 @@ const MatrixTable = ({
   );
 
   return (
-    <div className="overflow-x-auto pb-4">
-      <table className="w-full text-sm border-separate border-spacing-0 border border-gray-200 rounded-xl shadow-sm">
-        <thead className="bg-gray-50">
-          <tr>
-            <th className="p-4 text-left font-semibold text-gray-900 border-b border-gray-200 rounded-tl-xl w-64 bg-gray-100">
-              Criteria \ Alternatives
-            </th>
-            {alternatives.map((alt, index) => (
-              <th
-                key={alt.id}
-                className={`group relative p-4 text-center font-semibold text-gray-900 border-b border-l border-gray-200 
-                  ${index === alternatives.length - 1 ? 'rounded-tr-xl' : ''}`}
-              >
-                <div className="flex flex-col items-center gap-1">
-                  <span>{alt.name}</span>
-                  {alt.description && (
-                    <span className="text-xs text-gray-500 font-normal line-clamp-1">
-                      {alt.description}
-                    </span>
-                  )}
-                </div>
-                <ActionButtons
-                  onEdit={() => onEditAlternative(alt)}
-                  onDelete={() => onDeleteAlternative(alt.id)}
-                />
+    <div className="space-y-6">
+      {/* Expertise Aggregation & Math Panel */}
+      <ExpertiseMathPanel
+        projectId={projectId}
+        onSuccess={onAggregationSuccess}
+      />
+
+      {/* Matrix Table */}
+      <div className="overflow-x-auto pb-4">
+        <table className="w-full text-sm border-separate border-spacing-0 border border-gray-200 rounded-xl shadow-sm">
+          <thead className="bg-gray-50">
+            <tr>
+              <th className="p-4 text-left font-semibold text-gray-900 border-b border-gray-200 rounded-tl-xl w-64 bg-gray-100">
+                Criteria \ Alternatives
               </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-gray-200 bg-white">
-          {criteria.map((crit, critIndex) => (
-            <tr key={crit.id} className="hover:bg-gray-50 transition-colors">
-              <td
-                className={`group relative p-4 border-r border-gray-200 font-medium text-gray-700 w-64
-                ${critIndex === criteria.length - 1 ? 'rounded-bl-xl' : ''}`}
-              >
-                <div className="flex flex-col gap-1 pr-6">
-                  <span className="text-gray-950 font-semibold">
-                    {crit.name}
-                  </span>
-                  <span
-                    className={`text-xs font-mono uppercase px-2 py-0.5 rounded ${crit.type === 'maximize' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'} self-start`}
-                  >
-                    {crit.type}
-                  </span>
-                  {crit.description && (
-                    <span className="text-xs text-gray-500 font-normal mt-1">
-                      {crit.description}
-                    </span>
-                  )}
-                </div>
-                <ActionButtons
-                  onEdit={() => onEditCriterion(crit)}
-                  onDelete={() => onDeleteCriterion(crit.id)}
-                />
-              </td>
-
-              {alternatives.map((alt, altIndex) => {
-                const key = `${alt.id}_${crit.id}`;
-                const value =
-                  localEdits[key] !== undefined
-                    ? localEdits[key]
-                    : originalValues[key] || '';
-                const status = savingStatus[key];
-
-                return (
-                  <td
-                    key={key}
-                    className={`p-2 border-l border-gray-200
-                    ${critIndex === criteria.length - 1 && altIndex === alternatives.length - 1 ? 'rounded-br-xl' : ''}`}
-                  >
-                    <div className="relative">
-                      <input
-                        type="number"
-                        value={value}
-                        onChange={(e) =>
-                          handleInputChange(alt.id, crit.id, e.target.value)
-                        }
-                        onBlur={() => handleSaveEvaluation(alt.id, crit.id)}
-                        className={`w-full p-2.5 text-center text-base rounded-lg border transition-all focus:outline-none focus:ring-2 disabled:opacity-50 ${getStatusColor(status)}`}
-                        disabled={status === 'saving'}
-                      />
-                    </div>
-                  </td>
-                );
-              })}
+              {alternatives.map((alt, index) => (
+                <th
+                  key={alt.id}
+                  className={`group relative p-4 text-center font-semibold text-gray-900 border-b border-l border-gray-200 
+                  ${index === alternatives.length - 1 ? 'rounded-tr-xl' : ''}`}
+                >
+                  <div className="flex flex-col items-center gap-1">
+                    <span>{alt.name}</span>
+                    {alt.description && (
+                      <span className="text-xs text-gray-500 font-normal line-clamp-1">
+                        {alt.description}
+                      </span>
+                    )}
+                  </div>
+                  <ActionButtons
+                    onEdit={() => onEditAlternative(alt)}
+                    onDelete={() => onDeleteAlternative(alt.id)}
+                  />
+                </th>
+              ))}
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody className="divide-y divide-gray-200 bg-white">
+            {criteria.map((crit, critIndex) => (
+              <tr key={crit.id} className="hover:bg-gray-50 transition-colors">
+                <td
+                  className={`group relative p-4 border-r border-gray-200 font-medium text-gray-700 w-64
+                ${critIndex === criteria.length - 1 ? 'rounded-bl-xl' : ''}`}
+                >
+                  <div className="flex flex-col gap-1 pr-6">
+                    <span className="text-gray-950 font-semibold">
+                      {crit.name}
+                    </span>
+                    <span
+                      className={`text-xs font-mono uppercase px-2 py-0.5 rounded ${crit.type === 'maximize' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'} self-start`}
+                    >
+                      {crit.type}
+                    </span>
+                    {crit.description && (
+                      <span className="text-xs text-gray-500 font-normal mt-1">
+                        {crit.description}
+                      </span>
+                    )}
+                  </div>
+                  <ActionButtons
+                    onEdit={() => onEditCriterion(crit)}
+                    onDelete={() => onDeleteCriterion(crit.id)}
+                  />
+                </td>
+
+                {alternatives.map((alt, altIndex) => {
+                  const key = `${alt.id}_${crit.id}`;
+                  const value =
+                    localEdits[key] !== undefined
+                      ? localEdits[key]
+                      : originalValues[key] || '';
+                  const status = savingStatus[key];
+
+                  return (
+                    <td
+                      key={key}
+                      className={`p-2 border-l border-gray-200
+                    ${critIndex === criteria.length - 1 && altIndex === alternatives.length - 1 ? 'rounded-br-xl' : ''}`}
+                    >
+                      <div className="relative">
+                        <input
+                          type="number"
+                          value={value}
+                          onChange={(e) =>
+                            handleInputChange(alt.id, crit.id, e.target.value)
+                          }
+                          onBlur={() => handleSaveEvaluation(alt.id, crit.id)}
+                          className={`w-full p-2.5 text-center text-base rounded-lg border transition-all focus:outline-none focus:ring-2 disabled:opacity-50 ${getStatusColor(status)}`}
+                          disabled={status === 'saving'}
+                        />
+                      </div>
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 };

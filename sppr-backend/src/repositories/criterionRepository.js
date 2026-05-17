@@ -30,6 +30,10 @@ export const update = async (id, data) => {
   return rows[0];
 };
 
+export const updateWeight = async (id, weight) => {
+  await db.query('UPDATE criteria SET weight = ? WHERE id = ?', [weight, id]);
+};
+
 export const remove = async (id) => {
   const [result] = await db.query('DELETE FROM criteria WHERE id = ?', [id]);
   return result.affectedRows > 0;

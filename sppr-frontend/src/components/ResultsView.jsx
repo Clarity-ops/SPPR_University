@@ -82,25 +82,25 @@ const ResultsView = ({ projectId, refreshTrigger }) => {
   if (!results) return null;
 
   // Find max score to scale the bar chart properly
-  const maxScore = Math.max(...results.rankings.map((r) => r.sawScore));
+  const maxScore = Math.max(...results.rankings.map((r) => r.additiveScore));
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
       <div className="bg-blue-50 border border-blue-100 p-6 rounded-xl shadow-sm">
         <h3 className="text-xl font-bold text-blue-900 mb-2">
-          System Recommendation
+          System Analysis Log
         </h3>
-        <p className="text-blue-800 leading-relaxed">{results.explanation}</p>
-        <div className="mt-4 flex gap-2">
-          {results.methodsUsed.map((method, idx) => (
-            <span
-              key={idx}
-              className="bg-blue-100 text-blue-700 text-xs px-2.5 py-1 rounded-full font-medium"
-            >
-              {method}
-            </span>
-          ))}
-        </div>
+        {results.analysisLog && results.analysisLog.length > 0 ? (
+          <ul className="text-blue-800 leading-relaxed list-disc pl-5 space-y-1">
+            {results.analysisLog.map((log, idx) => (
+              <li key={idx}>{log}</li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-blue-800 leading-relaxed">
+            No analysis logs available.
+          </p>
+        )}
       </div>
 
       <div>
@@ -110,10 +110,10 @@ const ResultsView = ({ projectId, refreshTrigger }) => {
         <div className="space-y-4">
           {results.rankings.map((alt, index) => {
             const percentage =
-              maxScore > 0 ? (alt.sawScore / maxScore) * 100 : 0;
+              maxScore > 0 ? (alt.additiveScore / maxScore) * 100 : 0;
             return (
               <div
-                key={alt.alternative_id}
+                key={alt.id}
                 className="bg-white border border-gray-100 p-4 rounded-xl shadow-sm relative overflow-hidden"
               >
                 <div className="flex justify-between items-end mb-2 relative z-10">
@@ -129,10 +129,10 @@ const ResultsView = ({ projectId, refreshTrigger }) => {
                   </div>
                   <div className="text-right">
                     <div className="text-lg font-bold text-gray-900">
-                      {alt.sawScore}
+                      {alt.additiveScore.toFixed(4)}
                     </div>
                     <div className="text-xs text-gray-500">
-                      WPM: {alt.wpmScore}
+                      WPM: {alt.multiplicativeScore} | Min: {alt.cautiousScore}
                     </div>
                   </div>
                 </div>

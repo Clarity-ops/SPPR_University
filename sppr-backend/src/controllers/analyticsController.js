@@ -3,8 +3,7 @@ import * as analyticsService from '../services/analyticsService.js';
 export const getProjectRanking = async (req, res, next) => {
   try {
     const { projectId } = req.params;
-    const analyticsResult =
-      await analyticsService.calculateProjectRanking(projectId);
+    const analyticsResult = await analyticsService.calculateRanking(projectId);
 
     res.status(200).json(analyticsResult);
   } catch (error) {

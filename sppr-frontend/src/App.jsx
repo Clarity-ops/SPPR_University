@@ -4,6 +4,8 @@ import Layout from './components/Layout';
 import MatrixTable from './components/MatrixTable';
 import EntityModal from './components/EntityModal';
 import ResultsView from './components/ResultsView';
+import ExpertiseView from './components/ExpertiseView';
+import RulesView from './components/RulesView';
 
 const App = () => {
   const [projects, setProjects] = useState([]);
@@ -224,9 +226,9 @@ const App = () => {
           </div>
         ) : (
           <div>
-            <div className="mb-6 flex justify-between items-end border-b border-gray-100 pb-6">
-              <div className="flex-1">
-                <div className="flex items-center gap-4 mb-2">
+            <div className="mb-6 flex flex-col sm:flex-row sm:justify-between items-start sm:items-end gap-4 border-b border-gray-100 pb-6">
+              <div className="flex-1 w-full flex flex-col">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 mb-2">
                   <h1 className="text-3xl font-extrabold text-gray-950">
                     {projectData.project?.name}
                   </h1>
@@ -268,9 +270,8 @@ const App = () => {
                 </button>
               </div>
             </div>
-
-            <div className="mb-6 border-b border-gray-100">
-              <div className="flex gap-2">
+            <div className="sticky top-0 z-10 mb-6 border-b border-gray-100 overflow-x-auto bg-white">
+              <div className="flex gap-2 min-w-max">
                 <button
                   onClick={() => handleSelectTab('matrix')}
                   className={`px-4 py-2 rounded-t-lg text-sm font-medium border border-b-0 transition-colors ${
@@ -291,15 +292,38 @@ const App = () => {
                 >
                   Results
                 </button>
+                <button
+                  onClick={() => handleSelectTab('expertise')}
+                  className={`px-4 py-2 rounded-t-lg text-sm font-medium border border-b-0 transition-colors ${
+                    activeTab === 'expertise'
+                      ? 'bg-white text-blue-700 border-gray-200'
+                      : 'bg-gray-50 text-gray-600 border-transparent hover:text-gray-900'
+                  }`}
+                >
+                  Expertise
+                </button>
+                <button
+                  onClick={() => handleSelectTab('rules')}
+                  className={`px-4 py-2 rounded-t-lg text-sm font-medium border border-b-0 transition-colors ${
+                    activeTab === 'rules'
+                      ? 'bg-white text-blue-700 border-gray-200'
+                      : 'bg-gray-50 text-gray-600 border-transparent hover:text-gray-900'
+                  }`}
+                >
+                  Rules
+                </button>
               </div>
             </div>
-
-            {activeTab === 'matrix' ? (
+            {activeTab === 'matrix' && (
               <MatrixTable
+                projectId={selectedProjectId}
                 alternatives={projectData.alternatives}
                 criteria={projectData.criteria}
                 evaluations={projectData.evaluations}
                 onEvaluationUpdated={() =>
+                  fetchProjectDetails(selectedProjectId)
+                }
+                onAggregationSuccess={() =>
                   fetchProjectDetails(selectedProjectId)
                 }
                 onEditAlternative={(alt) =>
@@ -309,10 +333,20 @@ const App = () => {
                 onEditCriterion={(crit) => openModal('criteria', 'edit', crit)}
                 onDeleteCriterion={(id) => handleDelete('criteria', id)}
               />
-            ) : (
+            )}
+            {activeTab === 'results' && (
               <ResultsView
                 projectId={selectedProjectId}
                 refreshTrigger={resultsRefreshToken}
+              />
+            )}
+            {activeTab === 'expertise' && (
+              <ExpertiseView projectId={selectedProjectId} />
+            )}
+            {activeTab === 'rules' && (
+              <RulesView
+                projectId={selectedProjectId}
+                criteria={projectData.criteria}
               />
             )}
           </div>
